@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Incapsulation.Failures;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,13 +11,7 @@ namespace Incapsulation.Failures
 
     public class Common
     {
-        public static int IsFailureSerious(int failureType)
-        {
-            if (failureType%2==0) return 1;
-            return 0;
-        }
-
-
+        
         public static int Earlier(object[] v, int day, int month, int year)
         {
             int vYear = (int)v[2];
@@ -54,19 +50,40 @@ namespace Incapsulation.Failures
             object[][] times,
             List<Dictionary<string, object>> devices)
         {
-
-            var problematicDevices = new HashSet<int>();
-            for (int i = 0; i < failureTypes.Length; i++)
-                if (Common.IsFailureSerious(failureTypes[i])==1 && Common.Earlier(times[i], day, month, year)==1)
-                    problematicDevices.Add(deviceId[i]);
-
             var result = new List<string>();
-            foreach (var device in devices)
-                if (problematicDevices.Contains((int)device["DeviceId"]))
-                    result.Add(device["Name"] as string);
+            DateTime receivedDate = new DateTime(year,month,day);
+            var devicesList = new List<Device>();
+            var failuresList = new List<Failure>();
 
+            for (int i=0; i< deviceId.Length; i++)
+            {
+                var newDevice = new Device() { Name = devices[i]["Name"] as string, Id = (int)devices[i]["DeviceId"] };
+                devicesList.Add(newDevice);
+                var newFailure = new Failure()
+                {
+                    FailuredDevice = newDevice,
+                    FailureTime = new DateTime((int)times[i][2],(int)times[i][1],(int)times[i][0]),
+                    IsFailureCritical = Failure.IsFailureSerious(failureTypes[i])
+                };
+                    failuresList.Add(newFailure);                    
+            }
+            result = FindDevicesFailedBeforeDate(receivedDate,failuresList,devicesList);
             return result;
+
         }
-           
+
+        public static List<string> FindDevicesFailedBeforeDate (DateTime failureDate, List<Failure> failures, List<Device> devices)
+        {
+            var problematicDevices = new List <string> ();
+            foreach (var device in devices)
+                foreach (var failure in failures)
+                {
+                    if (device.Id == failure.FailuredDevice.Id && failure.FailureTime <= failureDate && failure.IsFailureCritical)
+                        problematicDevices.Add(device.Name);
+                }
+
+            return problematicDevices;
+        }
+
     }
 }
